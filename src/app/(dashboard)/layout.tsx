@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 
 import { getWorkspaceSummary } from "@/core/utils/workspace";
 import { MetricsCardSkeleton } from "@/components/skeletons/MetricsCardSkeleton";
+import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
+import { SidebarToggle } from "@/components/layout/SidebarToggle";
 
 const SIDEBAR_COOKIE_KEY = "ix-sidebar-state";
 
@@ -29,6 +31,7 @@ export default async function DashboardLayout({
       data-sidebar={isSidebarCollapsed ? "collapsed" : "expanded"}
     >
       <aside className="dashboard-sidebar" aria-label="Primary navigation">
+        <SidebarToggle isCollapsed={isSidebarCollapsed} />
         <nav>
           <ul>
             <li>Analytics</li>
@@ -40,7 +43,7 @@ export default async function DashboardLayout({
 
       <div className="dashboard-main">
         <header className="dashboard-header">
-          <span>{workspaceSummary.name}</span>
+          <WorkspaceSwitcher currentWorkspaceName={workspaceSummary.name} />
         </header>
 
         <Suspense fallback={<MetricsCardSkeleton />}>
