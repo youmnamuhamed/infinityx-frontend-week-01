@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useDebouncedValue } from "./useDebouncedValue";
 
 export type SortDirection = "asc" | "desc";
 
@@ -30,6 +31,9 @@ export interface UseDataGridOptions<TData> {
   data: TData[];
   columns: ColumnDef<TData>[];
   getRowId: (row: TData) => string;
+  /** Debounce delay (ms) applied to filter predicates before they hit the
+   *  data set. Defaults to 200ms. Pass 0 to disable (e.g. in tests). */
+  filterDebounceMs?: number;
 }
 
 export interface UseDataGridResult<TData> {
@@ -48,6 +52,7 @@ export interface UseDataGridResult<TData> {
   columnFilters: ColumnFiltersState;
   setColumnFilter: (columnId: string, filter: ColumnFilterValue | null) => void;
   clearFilters: () => void;
+  isFilterPending: boolean;
 
   selectedRowIds: Set<string>;
   toggleRowSelection: (
@@ -60,6 +65,16 @@ export interface UseDataGridResult<TData> {
 
   columnVisibility: Record<string, boolean>;
   toggleColumnVisibility: (columnId: string) => void;
+
+  /** Current display order of ALL column ids (visible + hidden). */
+  columnOrder: string[];
+  /** Swap a column one position earlier in columnOrder. No-op at the start. */
+  moveColumnLeft: (columnId: string) => void;
+  /** Swap a column one position later in columnOrder. No-op at the end. */
+  moveColumnRight: (columnId: string) => void;
+
+  /** columns, reordered per columnOrder then filtered by visibility —
+   *  this is what header/body rendering should map over. */
   visibleColumns: ColumnDef<TData>[];
 }
 
@@ -155,10 +170,30 @@ function applySorting<TData>(
   });
 }
 
+/**
+ * Reconciles a stored column-id order against the current columns prop:
+ * keeps known ids in their stored order, drops ids for columns that no
+ * longer exist, and appends any new column ids at the end. Pure function
+ * so it can be reused both for derived state and inside a setState updater.
+ */
+function reconcileColumnOrder<TData>(
+  columns: ColumnDef<TData>[],
+  order: string[],
+): string[] {
+  const validIds = new Set(columns.map((col) => col.id));
+  const known = order.filter((id) => validIds.has(id));
+  const knownSet = new Set(known);
+  const missing = columns
+    .map((col) => col.id)
+    .filter((id) => !knownSet.has(id));
+  return [...known, ...missing];
+}
+
 export function useDataGrid<TData>({
   data,
   columns,
   getRowId,
+  filterDebounceMs = 200,
 }: UseDataGridOptions<TData>): UseDataGridResult<TData> {
   const [sortingState, setSortingState] = useState<SortingRule[]>([]);
   const [globalFilter, setGlobalFilter] = useState<string>("");
@@ -170,9 +205,25 @@ export function useDataGrid<TData>({
   const [columnVisibility, setColumnVisibility] = useState<
     Record<string, boolean>
   >({});
+  const [columnOrder, setColumnOrder] = useState<string[]>(() =>
+    columns.map((col) => col.id),
+  );
+
+  const debouncedGlobalFilter = useDebouncedValue(
+    globalFilter,
+    filterDebounceMs,
+  );
+  const debouncedColumnFilters = useDebouncedValue(
+    columnFilters,
+    filterDebounceMs,
+  );
+
+  const isFilterPending =
+    globalFilter !== debouncedGlobalFilter ||
+    columnFilters !== debouncedColumnFilters;
 
   const toggleSort = useCallback((columnId: string, additive = false) => {
-    setSortingState((prev) => {
+    setSortingState((prev: SortingRule[]) => {
       const existing = prev.find((rule) => rule.columnId === columnId);
       const withoutColumn = prev.filter((rule) => rule.columnId !== columnId);
 
@@ -182,7 +233,7 @@ export function useDataGrid<TData>({
       } else if (existing.direction === "asc") {
         nextRule = { columnId, direction: "desc" };
       } else {
-        nextRule = null; // third click clears sort on this column
+        nextRule = null;
       }
 
       const base = additive ? withoutColumn : [];
@@ -194,7 +245,7 @@ export function useDataGrid<TData>({
 
   const setColumnFilter = useCallback(
     (columnId: string, filter: ColumnFilterValue | null) => {
-      setColumnFilters((prev) => {
+      setColumnFilters((prev: ColumnFiltersState) => {
         const next = { ...prev };
         if (filter === null) delete next[columnId];
         else next[columnId] = filter;
@@ -210,14 +261,24 @@ export function useDataGrid<TData>({
   }, []);
 
   const processedRows = useMemo(() => {
-    const afterGlobalFilter = applyGlobalFilter(data, columns, globalFilter);
+    const afterGlobalFilter = applyGlobalFilter(
+      data,
+      columns,
+      debouncedGlobalFilter,
+    );
     const afterColumnFilters = applyColumnFilters(
       afterGlobalFilter,
       columns,
-      columnFilters,
+      debouncedColumnFilters,
     );
     return applySorting(afterColumnFilters, columns, sortingState);
-  }, [data, columns, globalFilter, columnFilters, sortingState]);
+  }, [
+    data,
+    columns,
+    debouncedGlobalFilter,
+    debouncedColumnFilters,
+    sortingState,
+  ]);
 
   const toggleRowSelection = useCallback(
     (
@@ -225,7 +286,7 @@ export function useDataGrid<TData>({
       rowIndex: number,
       options?: { shiftKey?: boolean; metaOrCtrlKey?: boolean },
     ) => {
-      setSelectedRowIds((prev) => {
+      setSelectedRowIds((prev: Set<string>) => {
         const next = new Set(prev);
 
         if (options?.shiftKey && lastSelectedIndex !== null) {
@@ -266,15 +327,51 @@ export function useDataGrid<TData>({
   );
 
   const toggleColumnVisibility = useCallback((columnId: string) => {
-    setColumnVisibility((prev) => ({
+    setColumnVisibility((prev: Record<string, boolean>) => ({
       ...prev,
       [columnId]: prev[columnId] === false ? true : false,
     }));
   }, []);
 
+  const moveColumn = useCallback(
+    (columnId: string, direction: -1 | 1) => {
+      setColumnOrder((prev) => {
+        const ids = reconcileColumnOrder(columns, prev);
+        const index = ids.indexOf(columnId);
+        if (index === -1) return ids;
+
+        const swapIndex = index + direction;
+        if (swapIndex < 0 || swapIndex >= ids.length) return ids;
+
+        const next = [...ids];
+        [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+        return next;
+      });
+    },
+    [columns],
+  );
+
+  const moveColumnLeft = useCallback(
+    (columnId: string) => moveColumn(columnId, -1),
+    [moveColumn],
+  );
+
+  const moveColumnRight = useCallback(
+    (columnId: string) => moveColumn(columnId, 1),
+    [moveColumn],
+  );
+
+  const orderedColumns = useMemo(() => {
+    const ids = reconcileColumnOrder(columns, columnOrder);
+    const columnMap = new Map(columns.map((col) => [col.id, col]));
+    return ids
+      .map((id) => columnMap.get(id))
+      .filter((col): col is ColumnDef<TData> => col !== undefined);
+  }, [columns, columnOrder]);
+
   const visibleColumns = useMemo(
-    () => columns.filter((col) => columnVisibility[col.id] !== false),
-    [columns, columnVisibility],
+    () => orderedColumns.filter((col) => columnVisibility[col.id] !== false),
+    [orderedColumns, columnVisibility],
   );
 
   return {
@@ -289,12 +386,16 @@ export function useDataGrid<TData>({
     columnFilters,
     setColumnFilter,
     clearFilters,
+    isFilterPending,
     selectedRowIds,
     toggleRowSelection,
     clearSelection,
     isRowSelected,
     columnVisibility,
     toggleColumnVisibility,
+    columnOrder,
+    moveColumnLeft,
+    moveColumnRight,
     visibleColumns,
     getRowId,
   };

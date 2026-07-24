@@ -3,24 +3,47 @@
 import { useEffect, type KeyboardEvent } from "react";
 import { cellKey, useDataGridContext } from "./DataGrid";
 import { useVirtualizer } from "@/core/hooks/useVirtualizer";
+import { usePerformanceMonitor } from "@/core/hooks/usePerformanceMonitor";
 import { DataGridCell } from "./DataGridCell";
 
 export interface DataGridBodyProps {
   height?: number;
   className?: string;
+  /** Dev-only: logs FPS/jitter stats to console while scrolling. Has zero
+   *  effect outside development builds. Default false. */
+  enablePerfMonitor?: boolean;
 }
 
 export function DataGridBody<TData>({
   height = 600,
   className,
+  enablePerfMonitor = false,
 }: DataGridBodyProps) {
-  const { engine, rowHeight, activeCell, setActiveCell, cellRefs } =
-    useDataGridContext<TData>();
-  const { scrollElementRef, virtualItems, totalSize } =
-    useVirtualizer<HTMLDivElement>({
-      rowCount: engine.rowCount,
-      rowHeight,
-    });
+  const {
+    engine,
+    rowHeight,
+    enableDynamicSize,
+    activeCell,
+    setActiveCell,
+    cellRefs,
+  } = useDataGridContext<TData>();
+  const {
+    scrollElementRef,
+    virtualItems,
+    totalSize,
+    measureElement,
+    getItemOffset,
+    getItemSize,
+  } = useVirtualizer<HTMLDivElement>({
+    rowCount: engine.rowCount,
+    rowHeight,
+    enableDynamicSize,
+  });
+
+  usePerformanceMonitor(scrollElementRef, {
+    enabled: enablePerfMonitor,
+    label: "TelemetryGrid",
+  });
 
   // After scroll/re-render settles, focus the active cell if it's now mounted.
   // Runs again whenever virtualItems changes, so a cell that scrolls into view
@@ -36,8 +59,8 @@ export function DataGridBody<TData>({
   const scrollRowIntoView = (rowIndex: number): void => {
     const container = scrollElementRef.current;
     if (!container) return;
-    const rowTop = rowIndex * rowHeight;
-    const rowBottom = rowTop + rowHeight;
+    const rowTop = getItemOffset(rowIndex);
+    const rowBottom = rowTop + getItemSize(rowIndex);
     if (rowTop < container.scrollTop) {
       container.scrollTop = rowTop;
     } else if (rowBottom > container.scrollTop + container.clientHeight) {
@@ -117,6 +140,7 @@ export function DataGridBody<TData>({
           return (
             <div
               key={virtualItem.index}
+              ref={(el) => measureElement(el, virtualItem.index)}
               role="row"
               aria-rowindex={virtualItem.index + 2}
               aria-selected={engine.isRowSelected(engine.getRowId(row))}
@@ -125,7 +149,8 @@ export function DataGridBody<TData>({
                 top: 0,
                 left: 0,
                 right: 0,
-                height: virtualItem.size,
+                height: enableDynamicSize ? undefined : virtualItem.size,
+                minHeight: enableDynamicSize ? virtualItem.size : undefined,
                 transform: `translateY(${virtualItem.start}px)`,
                 display: "flex",
               }}
