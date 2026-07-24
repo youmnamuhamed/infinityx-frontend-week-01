@@ -441,3 +441,79 @@ body {
     display: flex;
   }
 }
+.isg-datagrid {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d9dde3;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 14px;
+}
+.isg-datagrid {
+  color: #1a1d21; /* was inheriting light text from your dark theme */
+}
+
+.isg-datagrid__header-cell {
+  color: #1a1d21;
+}
+
+.isg-datagrid__cell {
+  color: #2a2f36;
+}
+
+.isg-datagrid__header-row {
+  display: flex;
+  background: #f4f6f8;
+  border-bottom: 2px solid #d9dde3;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.isg-datagrid__header-cell {
+  flex: 1;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.isg-datagrid__header-cell:hover {
+  background: #e9edf1;
+}
+
+.isg-datagrid__body {
+  background: #fff;
+}
+
+.isg-datagrid__cell {
+  flex: 1;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef0f3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.isg-telemetry-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.isg-telemetry-page__filter {
+  padding: 8px 12px;
+  border: 1px solid #d9dde3;
+  border-radius: 6px;
+  width: 320px;
+  margin-top: 8px;
+}
+.isg-datagrid__cell:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+[aria-selected="true"] {
+  background: #eaf2ff;
+}
