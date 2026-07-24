@@ -2,6 +2,16 @@
 "use server";
 
 import { cookies } from "next/headers";
+import {
+  LayoutGrid,
+  Rocket,
+  BarChart2,
+  GitBranch,
+  Users,
+  ShieldCheck,
+  Puzzle,
+  Settings,
+} from "lucide-react";
 
 const SIDEBAR_COOKIE_KEY = "ix-sidebar-state";
 
@@ -13,3 +23,4 @@ export async function setSidebarState(state: "collapsed" | "expanded") {
     sameSite: "lax",
   });
 }
+

@@ -5,6 +5,7 @@ import { BillingMeter } from "@/components/compound/dashboard/BillingMeter";
 import { NodeCount } from "@/components/compound/dashboard/NodeCount";
 import { ClusterStatus } from "@/components/compound/dashboard/ClusterStatus";
 import { MetricsCardSkeleton } from "@/components/skeletons/MetricsCardSkeleton";
+import { ResourceLink } from "@/components/compound/resources/ResourceLink";
 
 interface AnalyticsPageProps {
   params: Promise<{ workspaceId: string }>;
@@ -29,6 +30,12 @@ export default async function AnalyticsPage({ params }: AnalyticsPageProps) {
         <Suspense fallback={<MetricsCardSkeleton />}>
           <ClusterStatus workspaceId={workspaceId} />
         </Suspense>
+      </div>
+      <div className="resource-links-demo">
+        <p className="resource-links-demo__label">Resource Preview Demo</p>
+        <ResourceLink workspaceId={workspaceId} resourceId="res-001">
+          View Resource res-001 →
+        </ResourceLink>
       </div>
     </section>
   );
