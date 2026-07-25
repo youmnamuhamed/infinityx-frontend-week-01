@@ -34,7 +34,7 @@ export interface TelemetryMetrics {
 }
 
 export interface TelemetryEvent extends RingBufferItem {
-  seq_id: number;
+  seq_id: string; // "{connectionGeneration}:{serverSeqId}" - globally unique across reconnects
   node_id: string;
   timestamp: number;
   metrics: TelemetryMetrics;
@@ -109,6 +109,7 @@ export function useTelemetryStream(
     let rafId: number | null = null;
     let pendingFlush = false;
     let retries = 0;
+    let connectionGeneration = 0;
 
     const clearHeartbeatWatchdog = () => {
       if (heartbeatTimeout) {
@@ -178,6 +179,8 @@ export function useTelemetryStream(
       if (isUnmounted) return;
       teardown();
       setStatus(retries === 0 ? "CONNECTING" : "RECONNECTING");
+      connectionGeneration += 1;
+      const myGeneration = connectionGeneration;
 
       const es = new EventSource(url);
       eventSource = es;
@@ -199,7 +202,13 @@ export function useTelemetryStream(
         if (isUnmounted) return;
         armHeartbeatWatchdog(); // telemetry data also counts as liveness
         try {
-          const parsed = JSON.parse(evt.data) as TelemetryEvent;
+          const raw = JSON.parse(evt.data) as Omit<TelemetryEvent, "seq_id"> & {
+            seq_id: number;
+          };
+          const parsed: TelemetryEvent = {
+            ...raw,
+            seq_id: `${myGeneration}:${raw.seq_id}`,
+          };
           bufferRef.current!.push(parsed); // no-op if duplicate seq_id
           scheduleFlush();
         } catch {

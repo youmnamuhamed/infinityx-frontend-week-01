@@ -22,6 +22,11 @@ import { Sparkline } from "@/components/primitive/Sparkline";
  * and passes each card only its own slice of state, which is what makes
  * the React.memo wrapper below actually effective: unrelated node updates
  * never reach a card that isn't affected by them.
+ *
+ * Colors/spacing are pulled from the project's global design tokens
+ * (--ix-*, defined in globals.css) via Tailwind arbitrary values, so this
+ * card automatically matches the rest of the dashboard (sidebar, metric
+ * cards, etc.) rather than using an invented palette.
  * ---------------------------------------------------------------------------
  */
 
@@ -59,39 +64,43 @@ export interface NodeCardProps {
   onCpuLimitChange: (nextLimit: number) => void;
 }
 
-const STATUS_STYLES: Record<
-  NodeStatus,
-  { label: string; edge: string; dot: string; text: string }
-> = {
+interface StatusStyle {
+  label: string;
+  edge: string;
+  dot: string;
+  text: string;
+}
+
+const STATUS_STYLES: Record<NodeStatus, StatusStyle> = {
   healthy: {
     label: "Healthy",
-    edge: "bg-[#3DD68C]",
-    dot: "bg-[#3DD68C]",
-    text: "text-[#3DD68C]",
+    edge: "bg-(--ix-success)",
+    dot: "bg-(--ix-success)",
+    text: "text-(--ix-success)",
   },
   warning: {
     label: "Warning",
-    edge: "bg-[#E3A008]",
-    dot: "bg-[#E3A008]",
-    text: "text-[#E3A008]",
+    edge: "bg-(--ix-warning)",
+    dot: "bg-(--ix-warning)",
+    text: "text-(--ix-warning)",
   },
   critical: {
     label: "Critical",
-    edge: "bg-[#E5484D]",
-    dot: "bg-[#E5484D]",
-    text: "text-[#E5484D]",
+    edge: "bg-(--ix-danger)",
+    dot: "bg-(--ix-danger)",
+    text: "text-(--ix-danger)",
   },
   restarting: {
     label: "Restarting",
-    edge: "bg-[#5B8DEF]",
-    dot: "bg-[#5B8DEF]",
-    text: "text-[#5B8DEF]",
+    edge: "bg-(--ix-accent)",
+    dot: "bg-(--ix-accent)",
+    text: "text-(--ix-accent)",
   },
   offline: {
     label: "Offline",
-    edge: "bg-[#4B5563]",
-    dot: "bg-[#4B5563]",
-    text: "text-[#4B5563]",
+    edge: "bg-(--ix-text-muted)",
+    dot: "bg-(--ix-text-muted)",
+    text: "text-(--ix-text-muted)",
   },
 };
 
@@ -107,7 +116,7 @@ function MetricTile({
   data,
   color,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: number;
   unit: string;
@@ -115,18 +124,18 @@ function MetricTile({
   color: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-[#242A33] bg-[#0E1116] px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-(--ix-radius) border border-(--ix-border-subtle) bg-(--ix-surface-raised) px-3 py-2">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="text-[#8B93A1]" aria-hidden="true">
+        <span className="text-(--ix-text-muted)" aria-hidden="true">
           {icon}
         </span>
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wide text-[#8B93A1]">
+          <div className="text-[11px] uppercase tracking-wide text-(--ix-text-muted)">
             {label}
           </div>
-          <div className="font-mono text-sm text-[#E4E7EB] tabular-nums">
+          <div className="font-mono text-sm text-(--ix-text-primary) tabular-nums">
             {value.toFixed(1)}
-            <span className="text-[#8B93A1]">{unit}</span>
+            <span className="text-(--ix-text-muted)">{unit}</span>
           </div>
         </div>
       </div>
@@ -166,7 +175,7 @@ function NodeCardImpl({
 
   return (
     <div
-      className="relative overflow-hidden rounded-lg border border-[#242A33] bg-[#12151A]"
+      className="relative overflow-hidden rounded-(--ix-radius) border border-(--ix-border) bg-(--ix-surface)"
       data-node-id={nodeId}
     >
       {/* Status edge - readable at a glance without reading any text */}
@@ -176,7 +185,9 @@ function NodeCardImpl({
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="truncate font-medium text-[#E4E7EB]">{nodeName}</h3>
+            <h3 className="truncate font-medium text-(--ix-text-primary)">
+              {nodeName}
+            </h3>
             <div className="mt-0.5 flex items-center gap-1.5 text-xs">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`}
@@ -188,13 +199,13 @@ function NodeCardImpl({
 
           {/* Pending sync indicator - subtle pulse, not a spinner */}
           <div
-            className="flex items-center gap-1.5 text-xs text-[#5B8DEF]"
+            className="flex items-center gap-1.5 text-xs text-(--ix-accent)"
             aria-live="polite"
           >
             {isAnyPending && (
               <>
                 <span
-                  className="h-1.5 w-1.5 rounded-full bg-[#5B8DEF] animate-pulse-soft motion-reduce:animate-none"
+                  className="h-1.5 w-1.5 rounded-full bg-(--ix-accent) animate-pulse-soft motion-reduce:animate-none"
                   aria-hidden="true"
                 />
                 <span>Syncing…</span>
@@ -211,7 +222,7 @@ function NodeCardImpl({
             value={metrics.cpu}
             unit="%"
             data={history.cpu}
-            color="#5B8DEF"
+            color="var(--ix-accent)"
           />
           <MetricTile
             icon={<MemoryStick size={14} />}
@@ -219,7 +230,7 @@ function NodeCardImpl({
             value={metrics.memory}
             unit="%"
             data={history.memory}
-            color="#3DD68C"
+            color="var(--ix-success)"
           />
           <MetricTile
             icon={<Gauge size={14} />}
@@ -227,7 +238,7 @@ function NodeCardImpl({
             value={metrics.latencyMs}
             unit="ms"
             data={history.latencyMs}
-            color="#E3A008"
+            color="var(--ix-warning)"
           />
           <MetricTile
             icon={<Network size={14} />}
@@ -235,14 +246,14 @@ function NodeCardImpl({
             value={metrics.connections}
             unit=""
             data={history.connections}
-            color="#8B93A1"
+            color="var(--ix-text-secondary)"
           />
         </div>
 
         {/* Controls */}
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#242A33] pt-3">
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-(--ix-border-subtle) pt-3">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-wide text-[#8B93A1]">
+            <span className="text-[11px] uppercase tracking-wide text-(--ix-text-muted)">
               CPU limit
             </span>
             <div className="flex items-center gap-1">
@@ -251,11 +262,11 @@ function NodeCardImpl({
                 onClick={() => handleCpuLimitStep(-CPU_LIMIT_STEP)}
                 disabled={isCpuLimitPending || cpuLimit <= CPU_LIMIT_MIN}
                 aria-label={`Decrease CPU limit for ${nodeName}`}
-                className="flex h-6 w-6 items-center justify-center rounded border border-[#242A33] text-[#8B93A1] hover:text-[#E4E7EB] hover:border-[#3A4250] disabled:opacity-40 disabled:hover:text-[#8B93A1] disabled:hover:border-[#242A33] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5B8DEF]"
+                className="flex h-6 w-6 items-center justify-center rounded border border-(--ix-border) text-(--ix-text-muted) hover:text-(--ix-text-primary) hover:border-(--ix-accent) disabled:opacity-40 disabled:hover:text-(--ix-text-muted) disabled:hover:border-(--ix-border) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ix-accent)"
               >
                 <Minus size={12} />
               </button>
-              <span className="w-10 text-center font-mono text-sm tabular-nums text-[#E4E7EB]">
+              <span className="w-10 text-center font-mono text-sm tabular-nums text-(--ix-text-primary)">
                 {cpuLimit}%
               </span>
               <button
@@ -263,7 +274,7 @@ function NodeCardImpl({
                 onClick={() => handleCpuLimitStep(CPU_LIMIT_STEP)}
                 disabled={isCpuLimitPending || cpuLimit >= CPU_LIMIT_MAX}
                 aria-label={`Increase CPU limit for ${nodeName}`}
-                className="flex h-6 w-6 items-center justify-center rounded border border-[#242A33] text-[#8B93A1] hover:text-[#E4E7EB] hover:border-[#3A4250] disabled:opacity-40 disabled:hover:text-[#8B93A1] disabled:hover:border-[#242A33] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5B8DEF]"
+                className="flex h-6 w-6 items-center justify-center rounded border border-(--ix-border) text-(--ix-text-muted) hover:text-(--ix-text-primary) hover:border-(--ix-accent) disabled:opacity-40 disabled:hover:text-(--ix-text-muted) disabled:hover:border-(--ix-border) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ix-accent)"
               >
                 <Plus size={12} />
               </button>
@@ -274,7 +285,7 @@ function NodeCardImpl({
             type="button"
             onClick={onRestart}
             disabled={isRestartPending || status === "offline"}
-            className="flex items-center gap-1.5 rounded-md border border-[#242A33] px-2.5 py-1.5 text-xs font-medium text-[#E4E7EB] hover:border-[#3A4250] hover:bg-[#181C22] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:border-[#242A33] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5B8DEF]"
+            className="flex items-center gap-1.5 rounded-(--ix-radius) border border-(--ix-border) px-2.5 py-1.5 text-xs font-medium text-(--ix-text-primary) hover:border-(--ix-accent) hover:bg-(--ix-surface-raised) disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:border-(--ix-border) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ix-accent)"
           >
             <RotateCw
               size={13}
