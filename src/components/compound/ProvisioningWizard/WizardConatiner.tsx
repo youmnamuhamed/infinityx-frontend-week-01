@@ -25,11 +25,17 @@ import {
   buildSecuritySchema,
   type NetworkTopologyData,
 } from "@/core/schemas/provisioningSchema";
+import {
+  submitProvisioningRequest,
+  ProvisioningError,
+  type ProvisioningResult,
+} from "@/core/utils/provisionResource";
 import { WizardStepper } from "./WizardStepper";
 import { StepGeneralConfig } from "./StepGeneralConfig";
 import { StepNetworkConfig } from "./StepNetworkConfig";
 import { StepSecurityConfig } from "./StepSecurityConfig";
 import { StepReviewSubmission } from "./StepReviewSubmission";
+import { ProvisionSuccess } from "./ProvisionSuccess";
 
 const STEP_ORDER = [...PROVISIONING_STEPS];
 
@@ -161,9 +167,21 @@ export function WizardContainer({ workspaceId }: WizardContainerProps) {
     enabled: true,
   });
 
-  // Keep the URL in sync with step + non-sensitive field values. scroll:
-  // false avoids yanking the page back to the top on every field change.
+  // Provisioning + result state lives here (not inside StepReviewSubmission)
+  // so the button's `disabled` attribute, the Cmd/Ctrl+Enter shortcut, and
+  // the success-view swap all share one source of truth — otherwise the
+  // shortcut could fire a second provision call mid-flight, since it
+  // doesn't go through the DOM button.
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [provisionError, setProvisionError] = useState<string | null>(null);
+  const [provisionResult, setProvisionResult] =
+    useState<ProvisioningResult | null>(null);
+
+  // Keep the URL in sync with step + non-sensitive field values, but only
+  // while the wizard is still active — once provisioned, the step params
+  // are stale and shouldn't keep round-tripping through history.replace.
   useEffect(() => {
+    if (provisionResult) return;
     const flatFields = {
       environment: engine.context.general.environment,
       region: engine.context.general.region,
@@ -172,7 +190,7 @@ export function WizardContainer({ workspaceId }: WizardContainerProps) {
     };
     const params = serializeStateToParams(engine.currentStepId, flatFields);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [engine.currentStepId, engine.context, pathname, router]);
+  }, [engine.currentStepId, engine.context, pathname, router, provisionResult]);
 
   const handleRestoreDraft = () => {
     const restored = draft.restoreDraft();
@@ -192,39 +210,45 @@ export function WizardContainer({ workspaceId }: WizardContainerProps) {
   const isFirstStep = engine.currentStepIndex === 0;
   const isReviewStep = engine.currentStepId === "review-submit";
 
-  // Provisioning state lives here (not inside StepReviewSubmission) so both
-  // the button's `disabled` attribute and the Cmd/Ctrl+Enter shortcut below
-  // share one source of truth — otherwise the shortcut could fire a second
-  // provision call mid-flight, since it doesn't go through the DOM button.
-  const [isProvisioning, setIsProvisioning] = useState(false);
-  const [provisionError, setProvisionError] = useState<string | null>(null);
-
   const handleProvision = useCallback(async () => {
     if (isProvisioning) return;
     setIsProvisioning(true);
     setProvisionError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1200)); // simulated provisioning call
+      const result = await submitProvisioningRequest(engine.context);
       draft.clearSavedDraft();
-    } catch {
-      setProvisionError(
-        "Provisioning failed. Check the details below and try again.",
-      );
+      setProvisionResult(result);
+    } catch (err) {
+      const message =
+        err instanceof ProvisioningError
+          ? err.message
+          : "Provisioning failed. Check the details below and try again.";
+      setProvisionError(message);
     } finally {
       setIsProvisioning(false);
     }
-  }, [isProvisioning, draft]);
+  }, [isProvisioning, engine.context, draft]);
+
+  const handleProvisionAnother = useCallback(() => {
+    setProvisionResult(null);
+    setProvisionError(null);
+    engine.updateContext(EMPTY_CONTEXT);
+    engine.jumpToStep(STEP_ORDER[0]);
+    draft.dismissDraft();
+  }, [engine, draft]);
 
   useWizardKeyboardShortcut({
     formId: !isReviewStep ? `step-${engine.currentStepId}` : undefined,
-    onShortcut: isReviewStep ? handleProvision : undefined,
+    onShortcut: isReviewStep && !provisionResult ? handleProvision : undefined,
   });
 
-  // Move focus to the new step's heading on transition, so screen reader
-  // users aren't left stranded on the old Continue button after the DOM
-  // beneath it swaps out. Skipped on the very first render so mounting the
-  // page doesn't yank focus away from wherever the user actually landed.
+  // Move focus to the new step's (or the success view's) heading on
+  // transition, so screen reader users aren't left stranded on the old
+  // Continue/Provision button after the DOM beneath it swaps out. Skipped
+  // on the very first render so mounting the page doesn't yank focus away
+  // from wherever the user actually landed.
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const successHeadingRef = useRef<HTMLHeadingElement>(null);
   const isFirstRender = useRef(true);
 
   useEffect(() => {
@@ -232,8 +256,25 @@ export function WizardContainer({ workspaceId }: WizardContainerProps) {
       isFirstRender.current = false;
       return;
     }
-    stepHeadingRef.current?.focus();
-  }, [engine.currentStepId]);
+    if (provisionResult) {
+      successHeadingRef.current?.focus();
+    } else {
+      stepHeadingRef.current?.focus();
+    }
+  }, [engine.currentStepId, provisionResult]);
+
+  if (provisionResult) {
+    return (
+      <div className="mx-auto w-full max-w-2xl">
+        <ProvisionSuccess
+          result={provisionResult}
+          workspaceId={workspaceId}
+          onProvisionAnother={handleProvisionAnother}
+          headingRef={successHeadingRef}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-2xl">

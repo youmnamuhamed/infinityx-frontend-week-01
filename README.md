@@ -354,6 +354,17 @@ src/
 - **Restyled to dashboard tokens instead of left standalone.** The wizard was initially built with hardcoded light-mode Tailwind classes; it was subsequently remapped onto the app's existing `--ix-*` dark theme custom properties (exposed via `@theme inline` as utilities like `bg-surface`, `text-fg-muted`, `border-accent`) so it reads as part of the same product as Tasks 01–02, not a bolted-on form.
 - **Keyboard shortcut scoped to the wizard, not global.** `useWizardKeyboardShortcut` is mounted only within `WizardContainer`, so Cmd/Ctrl+Enter only advances/submits while the wizard is open — it doesn't leak into unrelated pages.
 
+## Provisioning Flow
+
+The final "Provision Cluster" action on the Review step follows the same async-with-failure-mode shape a real API call would have, rather than an instant no-op:
+
+- **Submit.** `submitProvisioningRequest(context)` (in `core/utils/provisionResource.ts`) simulates a ~1.2–1.7s network call and either resolves with a `ProvisioningResult` (`resourceId`, `status`, `provisionedAt`) or throws a `ProvisioningError`. It's a drop-in mock: the call site doesn't change when it's swapped for a real `fetch()`/Server Action later.
+- **In flight.** A single `isProvisioning` boolean (owned by `WizardContainer`, not the review step itself) drives both the button's `disabled` state and gates the Cmd/Ctrl+Enter shortcut, so the shortcut can't fire a second concurrent submission — it bypasses the DOM button entirely, so a shared boolean is the only thing actually preventing a double-submit.
+- **On success.** The saved draft is cleared (`draft.clearSavedDraft()`), and the wizard swaps its entire stepper+card view for `ProvisionSuccess` — a terminal screen showing the resource ID, status, and timestamp, with "Go to resource" and "Provision another" actions. The URL-sync effect short-circuits once a result exists, so it stops rewriting `?step=` params behind a screen that no longer represents a step.
+- **On failure.** `provisionError` is set and rendered inline on the Review step (not a toast), the button re-enables, and all entered data is left untouched so the user can fix the underlying issue and retry without redoing the wizard.
+- **Provision another.** Resets `context` to empty, jumps the engine back to `general-info`, and dismisses any leftover draft banner — a clean restart rather than leaving stale values behind.
+- **Accessibility.** Focus moves to the success heading on transition, the same way it already moves to each step's heading — screen reader users aren't left on a button whose surrounding DOM just got replaced.
+
 ## Route Structure
 
 | Route                                 | Type        | Description                                                                      |
@@ -385,9 +396,10 @@ Then visit `http://localhost:3000/workspaces/ws-001/provision` to walk through t
 
 ## Future Improvements
 
-- Wire final submission to a real provisioning API/backend instead of the current mock submit handler.
+- Swap `submitProvisioningRequest`'s mock body for a real provisioning API/backend call — the `ProvisioningResult` / `ProvisioningError` contract at the call site is already shaped to make that a non-breaking change.
 - Reuse `provisioningSchema.ts`'s validation rules server-side (via a Server Action) so submission is validated again on the server, not just trusted from client-side checks.
 - Add a "resume draft" prompt on re-entry when a persisted draft is detected, rather than silently restoring it.
 - Extend `WizardStepper` to support marking steps as skippable/optional for flows that don't need all four steps.
 - Add step-level analytics (time spent per step, abandonment point) once real usage data matters.
 - Generalize `useWorkflowEngine` into a small shared package if a second multi-step flow (e.g. onboarding) is built, rather than each wizard reimplementing its own engine.
+- Persist `provisionResult` (not just the in-progress draft) across a refresh, so a hard reload immediately after a successful provision doesn't drop back into an empty wizard.
