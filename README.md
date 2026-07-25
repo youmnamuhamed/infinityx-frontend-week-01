@@ -1,9 +1,10 @@
 # Infinity X Enterprise Cloud Portal — Week 01
 
-Frontend internship deliverables for **Infinity X Solutions**, built with Next.js App Router (v16) and TypeScript. This document covers both tasks completed in Week 1:
+Frontend internship deliverables for **Infinity X Solutions**, built with Next.js App Router (v16) and TypeScript. This document covers all three tasks completed in Week 1:
 
 - **Task 01** — App Router architecture & dynamic portal layout system
 - **Task 02** — Headless, high-performance virtualized data grid
+- **Task 03** — Multi-step resource provisioning wizard
 
 ---
 
@@ -284,3 +285,109 @@ Then visit:
 - Add resizable columns (drag-based width adjustment) alongside the existing reorder buttons.
 - Persist grid state (sort/filters/column order) to the URL or local storage so it survives a page refresh.
 - Add automated performance regression tests around the `usePerformanceMonitor` benchmark numbers (currently console-only, not asserted against thresholds in CI).
+
+---
+
+# Task 03 – Multi-Step Resource Provisioning Wizard
+
+## Overview
+
+Task 03 builds a general-purpose, multi-step provisioning wizard for spinning up a new cloud resource inside a workspace — General Config → Network Config → Security Config → Review & Submission. The core engineering goal was to keep the step/transition logic entirely generic and decoupled from the specific provisioning domain, so the same engine could drive a completely different multi-step flow (onboarding, checkout, etc.) with only the step definitions and schema swapped out.
+
+The wizard also had to survive real-world interruptions: an accidental tab close, a refresh mid-flow, or a user jumping between steps out of order — without losing entered data or allowing an invalid step transition.
+
+## Features
+
+- Generic step/transition engine (`useWorkflowEngine`) driving an arbitrary ordered sequence of steps, independent of what each step actually contains
+- Cross-step conditional validation (e.g. a field required on Security Config only if a particular option was chosen back on Network Config) via a single Zod schema (`provisioningSchema.ts`) rather than per-step ad hoc checks
+- Draft auto-persistence (`useDraftPersistence`) — in-progress wizard state survives a refresh or accidental navigation away
+- URL-synced step state (`urlStateSync`) — the current step is reflected in the URL so back/forward and direct links land on the right step
+- Keyboard shortcut (`useWizardKeyboardShortcut`) — Cmd/Ctrl+Enter advances to the next step (or submits, on the final step) without leaving the keyboard
+- Stepper UI showing completed / current / upcoming / invalid steps at a glance
+- Fully restyled to the dashboard's dark theme token system, matching Tasks 01–02 visually instead of standing out as an unstyled add-on
+
+## Architecture
+
+The wizard follows the same headless-engine-plus-presentation split used in Task 02's data grid:
+
+```
+useWorkflowEngine     →  "what step are we on, can we move, is this step valid?" (generic, content-agnostic)
+provisioningSchema.ts →  "what does a valid provisioning request look like?" (Zod, cross-step aware)
+useDraftPersistence   →  "does in-progress state survive a reload?"
+urlStateSync          →  "does the URL agree with the current step?"
+WizardContainer/*      →  presentation + per-step form components, wiring everything together
+```
+
+`useWorkflowEngine` knows nothing about provisioning, networking, or security — it only understands an ordered list of step IDs, a validity predicate per step, and transition rules (can't advance past an invalid step, can jump backward freely, can't skip ahead). All provisioning-specific logic lives in `provisioningSchema.ts` and the individual `Step*Config` components, keeping the engine itself reusable.
+
+## Folder Structure
+
+```
+src/
+  core/
+    hooks/
+      useWorkflowEngine.ts               Generic step/transition engine (content-agnostic)
+      useDraftPersistence.ts              Persists/restores in-progress wizard state
+      useWizardKeyboardShortcut.ts        Cmd/Ctrl+Enter → next step / submit
+    utils/
+      urlStateSync.ts                     Keeps current step and URL in sync
+    schemas/
+      provisioningSchema.ts               Zod schema — per-step + cross-step conditional validation
+  components/
+    compound/wizard/
+      WizardContainer.tsx                 Root — wires engine, schema, persistence, and steps together
+      WizardStepper.tsx                   Visual step indicator (completed/current/upcoming/invalid)
+      StepGeneralConfig.tsx               Step 1 — resource name, type, workspace target
+      StepNetworkConfig.tsx               Step 2 — VPC/subnet, exposure, networking options
+      StepSecurityConfig.tsx              Step 3 — access policy, conditional fields driven by Step 2
+      StepReviewSubmission.tsx            Step 4 — read-only summary + final submit
+  app/(dashboard)/workspaces/[workspaceId]/
+    provision/page.tsx                    Wizard entry route
+```
+
+## Technical Decisions
+
+- **Generic engine, domain-specific schema.** `useWorkflowEngine` deliberately has no knowledge of provisioning — it's parameterized entirely by step IDs and a validity check. This mirrors the Task 02 philosophy of separating "headless logic" from "presentation," but applied to workflow/state-machine logic instead of virtualization math.
+- **One cross-step Zod schema over per-step validators.** Provisioning has fields on later steps whose requirement depends on choices made on earlier steps (e.g. Security Config fields gated by a Network Config option). Modeling this as a single schema with conditional (`.refine`/`superRefine`-style) rules avoids the drift and duplication that comes from scattering conditional logic across independent per-step validators.
+- **Draft persistence decoupled from the engine.** `useDraftPersistence` is a separate hook rather than being baked into `useWorkflowEngine`, so a future workflow built on the same engine can opt out of persistence (or use a different storage strategy) without touching the engine itself.
+- **URL as the source of truth for step position.** `urlStateSync` keeps the visible step reflected in the URL (rather than only in React state), so refreshing, sharing a link, or using browser back/forward all land on the expected step instead of always resetting to Step 1.
+- **Restyled to dashboard tokens instead of left standalone.** The wizard was initially built with hardcoded light-mode Tailwind classes; it was subsequently remapped onto the app's existing `--ix-*` dark theme custom properties (exposed via `@theme inline` as utilities like `bg-surface`, `text-fg-muted`, `border-accent`) so it reads as part of the same product as Tasks 01–02, not a bolted-on form.
+- **Keyboard shortcut scoped to the wizard, not global.** `useWizardKeyboardShortcut` is mounted only within `WizardContainer`, so Cmd/Ctrl+Enter only advances/submits while the wizard is open — it doesn't leak into unrelated pages.
+
+## Route Structure
+
+| Route                                 | Type        | Description                                                                      |
+| ------------------------------------- | ----------- | -------------------------------------------------------------------------------- |
+| `/workspaces/[workspaceId]/provision` | Client page | Task 03 — multi-step provisioning wizard (General → Network → Security → Review) |
+
+## Server vs Client Components
+
+The wizard is client-side throughout — it depends on interactive form state, keyboard event handling, `useWorkflowEngine`'s in-memory state machine, and draft persistence, none of which are meaningful on the server.
+
+- `"use client"`: `useWorkflowEngine`, `useDraftPersistence`, `useWizardKeyboardShortcut`, `WizardContainer.tsx`, `WizardStepper.tsx`, all four `Step*` components, `provision/page.tsx`.
+- `provisioningSchema.ts` has no directive — it's pure Zod schema code, importable from both client components today and, eventually, a server action or API route performing the same validation server-side before actually provisioning anything.
+
+## Performance Optimizations
+
+- **Validity checks scoped per step.** `useWorkflowEngine` only re-validates the active step (and, where cross-step rules apply, the specific fields those rules touch) rather than re-running the entire schema on every keystroke across all four steps.
+- **Debounced draft writes.** `useDraftPersistence` batches/debounces its persistence writes rather than writing on every field change, so rapid typing doesn't thrash storage.
+- **Step components mounted lazily by active step.** Only the current step's form fields are rendered at a time, keeping the mounted form surface (and associated re-render cost) small regardless of how many total steps the wizard grows to.
+- **Theme mapped via CSS custom properties, not per-component overrides.** Restyling to `--ix-*` tokens through `@theme inline` means the wizard picks up future theme changes automatically, instead of needing manual updates across five components if the palette shifts again.
+
+## Running the Project
+
+```bash
+npm install
+npm run dev
+```
+
+Then visit `http://localhost:3000/workspaces/ws-001/provision` to walk through the wizard end to end.
+
+## Future Improvements
+
+- Wire final submission to a real provisioning API/backend instead of the current mock submit handler.
+- Reuse `provisioningSchema.ts`'s validation rules server-side (via a Server Action) so submission is validated again on the server, not just trusted from client-side checks.
+- Add a "resume draft" prompt on re-entry when a persisted draft is detected, rather than silently restoring it.
+- Extend `WizardStepper` to support marking steps as skippable/optional for flows that don't need all four steps.
+- Add step-level analytics (time spent per step, abandonment point) once real usage data matters.
+- Generalize `useWorkflowEngine` into a small shared package if a second multi-step flow (e.g. onboarding) is built, rather than each wizard reimplementing its own engine.
