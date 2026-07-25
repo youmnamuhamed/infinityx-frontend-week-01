@@ -37,6 +37,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-surface: var(--ix-surface);
+  --color-surface-raised: var(--ix-surface-raised);
+  --color-border: var(--ix-border);
+  --color-border-subtle: var(--ix-border-subtle);
+  --color-fg-secondary: var(--ix-text-secondary);
+  --color-fg-muted: var(--ix-text-muted);
+  --color-accent: var(--ix-accent);
+  --color-accent-hover: var(--ix-accent-hover);
+  --color-success: var(--ix-success);
+  --color-warning: var(--ix-warning);
+  --color-danger: var(--ix-danger);
 }
 
 body {
