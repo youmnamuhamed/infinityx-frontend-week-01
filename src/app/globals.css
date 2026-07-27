@@ -1,33 +1,7 @@
 @import "tailwindcss";
+@import "../styles/tokens/theme.css";
 
 :root {
-  /* Surface layers */
-  --ix-bg: #0a0d12;
-  --ix-surface: #0f1319;
-  --ix-surface-raised: #131822;
-  --ix-border: #1f2531;
-  --ix-border-subtle: #171c26;
-
-  /* Text */
-  --ix-text-primary: #e8eaed;
-  --ix-text-secondary: #9aa3b2;
-  --ix-text-muted: #626b7a;
-
-  /* Accent */
-  --ix-accent: #3b82f6;
-  --ix-accent-hover: #5b93f7;
-
-  /* Status */
-  --ix-success: #22c55e;
-  --ix-warning: #f59e0b;
-  --ix-danger: #ef4444;
-
-  /* Layout */
-  --ix-sidebar-width-expanded: 260px;
-  --ix-sidebar-width-collapsed: 72px;
-  --ix-header-height: 64px;
-  --ix-radius: 8px;
-
   --background: var(--ix-bg);
   --foreground: var(--ix-text-primary);
 }
