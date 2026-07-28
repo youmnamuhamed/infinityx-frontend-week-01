@@ -1,0 +1,162 @@
+/* src/app/(dashboard)/design-system/design-system.module.css */
+
+.page {
+  padding: 32px;
+  max-width: 960px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ix-text-primary);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--ix-text-secondary);
+  margin: 0 0 24px;
+}
+
+/* ---- Theme toggle ---- */
+.themeToggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--ix-radius, 8px);
+  border: 1px solid var(--ix-border);
+  background: var(--ix-surface-raised);
+  margin-bottom: 24px;
+}
+
+.themeButton {
+  padding: 6px 12px;
+  border-radius: calc(var(--ix-radius, 8px) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--ix-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.themeButton:hover {
+  color: var(--ix-text-primary);
+}
+
+.themeButtonActive {
+  background: var(--ix-accent-solid-bg);
+  color: var(--ix-text-on-accent);
+}
+
+.themeButton:focus-visible {
+  outline: 2px solid var(--ix-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- Tabs ---- */
+.tabList {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--ix-border);
+  margin-bottom: 24px;
+}
+
+.tab {
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--ix-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--ix-text-primary);
+}
+
+.tabActive {
+  color: var(--ix-text-primary);
+  border-bottom-color: var(--ix-accent);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--ix-focus-ring);
+  outline-offset: -2px;
+}
+
+/* ---- Token swatches ---- */
+.tokenGroupTitle {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ix-text-secondary);
+  margin: 24px 0 10px;
+}
+
+.tokenGroupTitle:first-child {
+  margin-top: 0;
+}
+
+.swatchGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.swatch {
+  border: 1px solid var(--ix-border);
+  border-radius: var(--ix-radius, 8px);
+  overflow: hidden;
+  background: var(--ix-surface-raised);
+}
+
+.swatchColor {
+  height: 48px;
+  border-bottom: 1px solid var(--ix-border);
+}
+
+.swatchLabel {
+  padding: 8px 10px;
+}
+
+.swatchName {
+  display: block;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  color: var(--ix-text-primary);
+}
+
+.swatchValue {
+  display: block;
+  font-size: 11px;
+  color: var(--ix-text-secondary);
+  margin-top: 2px;
+}
+
+/* ---- Demo sections ---- */
+.demoRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.demoLabel {
+  font-size: 12px;
+  color: var(--ix-text-secondary);
+  margin-bottom: 6px;
+}
+
+.card {
+  padding: 16px;
+  border-radius: var(--ix-radius, 8px);
+  border: 1px solid var(--ix-border);
+  background: var(--ix-surface-raised);
+  margin-bottom: 16px;
+}

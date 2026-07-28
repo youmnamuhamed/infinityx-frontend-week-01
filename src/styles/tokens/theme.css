@@ -1,0 +1,146 @@
+/**
+ * IX-Design — Theme Engine
+ * -----------------------------------------------------------------------
+ * Tier 2 (semantic.ts) rendered as native CSS custom properties, scoped
+ * per `data-theme` value. Switching themes is a single attribute write
+ * on <html> (or any wrapper) — no JS re-render, no runtime cost:
+ *
+ *   document.documentElement.setAttribute('data-theme', 'high-contrast')
+ *
+ * All variables live under the `--ix-*` namespace to avoid collisions
+ * with third-party libraries, matching the existing convention.
+ *
+ * MIGRATION NOTE: this file is intentionally additive. It does not
+ * replace the --ix-* declarations in globals.css yet — both currently
+ * resolve to the same values under the default `dark` theme, so nothing
+ * currently rendered changes. Once the app is verified working with
+ * `<html data-theme="dark">` set (Step 3 wiring, next), the duplicate
+ * hardcoded block in globals.css's `:root` can be deleted in favor of
+ * this file as the single source of truth. Do not delete it yet.
+ *
+ * Import this file once, after your Tailwind import, e.g. in globals.css:
+ *   @import "./tokens/theme.css";
+ */
+
+/* ============================================================
+   Dark theme (default)
+   ============================================================ */
+:root,
+[data-theme="dark"] {
+  /* Backgrounds */
+  --ix-bg: #0a0d12;
+  --ix-surface: #0f1319;
+  --ix-surface-raised: #131822;
+
+  /* Borders */
+  --ix-border: #1f2531;
+  --ix-border-subtle: #171c26;
+
+  /* Text */
+  --ix-text-primary: #e8eaed;
+  --ix-text-secondary: #9aa3b2;
+  --ix-text-muted: #717a8a; /* corrected from legacy #626b7a — see semantic.ts */
+  --ix-text-on-accent: #ffffff;
+
+  /* Accent — split by role, see semantic.ts header comment */
+  --ix-accent: #3b82f6; /* text/icon use */
+  --ix-accent-hover: #5b93f7;
+  --ix-accent-subtle: #142748;
+  --ix-accent-solid-bg: #2757ad; /* background-under-white-text use */
+
+  /* Status */
+  --ix-success: #22c55e;
+  --ix-warning: #f59e0b;
+  --ix-danger: #ef4444;
+
+  /* Focus */
+  --ix-focus-ring: #3b82f6;
+
+  /* Layout (theme-invariant, repeated per block for single-lookup simplicity) */
+  --ix-radius: 8px;
+  --ix-sidebar-width-expanded: 260px;
+  --ix-sidebar-width-collapsed: 72px;
+  --ix-header-height: 64px;
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Light theme
+   ============================================================ */
+[data-theme="light"] {
+  --ix-bg: #f8fafc;
+  --ix-surface: #ffffff;
+  --ix-surface-raised: #eef1f5;
+
+  --ix-border: #dfe3ea;
+  --ix-border-subtle: #eef1f5;
+
+  --ix-text-primary: #171c26;
+  --ix-text-secondary: #545c6b;
+  --ix-text-muted: #717a8a; /* large text / icon-adjacent use only, ~4.3:1 */
+  --ix-text-on-accent: #ffffff;
+
+  --ix-accent: #2757ad;
+  --ix-accent-hover: #20458a;
+  --ix-accent-subtle: #eef4ff;
+  --ix-accent-solid-bg: #2757ad;
+
+  --ix-success: #15773a;
+  --ix-warning: #884b10;
+  --ix-danger: #dc2626;
+
+  --ix-focus-ring: #2757ad;
+
+  --ix-radius: 8px;
+  --ix-sidebar-width-expanded: 260px;
+  --ix-sidebar-width-collapsed: 72px;
+  --ix-header-height: 64px;
+
+  color-scheme: light;
+}
+
+/* ============================================================
+   High-contrast theme (WCAG AAA, low-vision accessibility mode)
+   ============================================================ */
+[data-theme="high-contrast"] {
+  --ix-bg: #000000;
+  --ix-surface: #0a0a0a;
+  --ix-surface-raised: #141414;
+
+  --ix-border: #ffffff;
+  --ix-border-subtle: #c3c9d4;
+
+  --ix-text-primary: #ffffff;
+  --ix-text-secondary: #eef1f5;
+  --ix-text-muted: #dfe3ea; /* ~16.3:1 — no low-contrast muted tier in this theme */
+  --ix-text-on-accent: #ffffff;
+
+  --ix-accent: #8fb2fb; /* ~9.9:1 vs black, text/icon use */
+  --ix-accent-hover: #bcd0fd;
+  --ix-accent-subtle: #142748;
+  --ix-accent-solid-bg: #1c3a70; /* ~11.1:1 with white text */
+
+  --ix-success: #75e5a5;
+  --ix-warning: #fbd24b;
+  --ix-danger: #fca5a5;
+
+  --ix-focus-ring: #ffffff;
+
+  --ix-radius: 8px;
+  --ix-sidebar-width-expanded: 260px;
+  --ix-sidebar-width-collapsed: 72px;
+  --ix-header-height: 64px;
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Reduced-motion respect (theme-invariant, but belongs at this layer
+   since it governs the same --ix-* consumers)
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ix-motion-duration: 0ms;
+  }
+}

@@ -1,0 +1,117 @@
+/* IX-Design — Button
+ * All colors reference --ix-* custom properties from the theme engine
+ * (theme.css) — never a literal hex value — so the button automatically
+ * re-themes under light/dark/high-contrast with zero changes here.
+ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--ix-radius, 8px);
+  border: 1px solid transparent;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ix-focus-ring);
+  outline-offset: 2px;
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Sizes ---- */
+.sm {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.md {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+.lg {
+  height: 44px;
+  padding: 0 20px;
+  font-size: 14px;
+}
+
+/* ---- Variants ---- */
+.primary {
+  background: var(--ix-accent-solid-bg);
+  color: var(--ix-text-on-accent);
+}
+.primary:not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--ix-accent-hover);
+}
+
+.secondary {
+  background: var(--ix-surface-raised);
+  color: var(--ix-text-primary);
+  border-color: var(--ix-border);
+}
+.secondary:not(:disabled):not([aria-disabled="true"]):hover {
+  border-color: var(--ix-accent);
+}
+
+.danger {
+  background: var(--ix-danger);
+  color: var(--ix-text-on-accent);
+}
+.danger:not(:disabled):not([aria-disabled="true"]):hover {
+  opacity: 0.9;
+}
+
+.ghost {
+  background: transparent;
+  color: var(--ix-text-secondary);
+}
+.ghost:not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--ix-surface-raised);
+  color: var(--ix-text-primary);
+}
+
+/* ---- Loading state ---- */
+.loading {
+  cursor: progress;
+}
+
+.labelLoading {
+  opacity: 0.6;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: ix-btn-spin 600ms linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ix-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1200ms;
+  }
+}
