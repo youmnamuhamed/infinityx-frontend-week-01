@@ -6,6 +6,8 @@ Frontend internship deliverables for **Infinity X Solutions**, built with Next.j
 - **Task 02** — Headless, high-performance virtualized data grid
 - **Task 03** — Multi-step provisioning wizard with a generic workflow engine
 - **Task 04** — Real-time telemetry stream & resilient optimistic UI engine
+- **Task 05** — Real-time telemetry stream & resilient optimistic UI engine
+- **Task 06** — Real-time telemetry stream & resilient optimistic UI engine
 
 ---
 
@@ -356,7 +358,9 @@ npm install
 npm run dev
 ```
 
-Then visit the provisioning wizard route under your workspace (see Folder Structure above for the exact segment — confirm and fill in).
+Then visit the provisioning wizard route under your workspace  
+`http://localhost:3000/workspaces/ws-001/provision`
+
 
 ## Future Improvements
 
@@ -471,3 +475,259 @@ To exercise the resilience features:
 - Add automated tests around the reconnection/backoff timing and the rollback path (currently verified manually).
 - Allow rapid repeated CPU-limit adjustments to cancel-and-replace the in-flight mutation instead of being dropped by the duplicate-dispatch guard, if that turns out to be the desired UX.
 - Persist the connection's `isPaused` preference across a page reload.
+
+
+# Task 05 – Enterprise Component Library Architecture & Design Token Engine
+
+## Overview
+
+Task 05 establishes the foundational architecture of the Infinity X Design System ("IX-Design"): a three-tier design token engine backed by native CSS custom properties, three switchable themes (dark, light, high-contrast/AAA), and two enterprise-grade compound components — a Modal Dialog and an accessible Combobox — built on shared `asChild` (Slot) and Portal primitives rather than a UI library.
+
+The goal was strict token discipline: no component file should ever reference a hardcoded hex value or pixel size directly. Everything routes through `--ix-*` CSS variables, which theme switching updates with zero runtime cost via a single `data-theme` attribute write.
+
+## Features
+
+- Three-tier token architecture — global (raw palette/scale), semantic (contextual `bg.surface`, `text.primary`, `accent.solidBg`, etc.), rendered as native CSS custom properties per theme
+- Three switchable themes: `dark` (default), `light`, and `high-contrast` — the latter tuned to WCAG 2.1 AAA (7:1) for low-vision users, the other two to WCAG 2.1 AA
+- Split accent tokens (`accent.default` for text/icon use vs. `accent.solidBg` for filled backgrounds under white text) — a deliberate fix for the existing app's single `--ix-accent`, which can't satisfy AA contrast in both roles at once
+- Compound `<Modal>` — Trigger/Portal/Overlay/Content/Header/Title/Body/Footer/CloseButton, with full focus trapping, scroll lock, and Escape-to-close
+- Compound `<Combobox>` — headless Root/Input/List/Item/Group, ARIA 1.2 combobox pattern (`aria-activedescendant`, focus never leaves the input), typeahead filtering left to the consumer for custom item templates and grouping
+- `asChild` polymorphism via a shared `<Slot>` primitive — `<Modal.Trigger asChild><a href="...">` renders a real `<a>`, not an invalid `<button>`-wrapping-`<a>`
+- `<Portal>` utility rendering into a dedicated `#ix-portal-root` node, SSR-safe (renders nothing until client mount, avoiding hydration mismatches)
+- `<Button>` (variants, sizes, loading spinner, `asChild`) and `<Badge>` (variant/size/status-dot) primitive components, fully token-driven
+- Interactive showcase page (`/design-system`) with a live theme toggle, resolved-token swatches, and working Modal/Combobox demos
+
+## Architecture
+
+The system is layered the same way Tasks 1–4 layer their engines — pure logic/data at the bottom, presentation wired on top:
+
+```
+global.ts        →  raw palette + scale primitives (no semantic meaning)
+semantic.ts       →  per-theme contextual mapping onto global.ts (bg/text/accent/status/focusRing)
+theme.css         →  semantic.ts rendered as --ix-* custom properties, scoped by [data-theme="..."]
+                      (component code never imports semantic.ts directly — it reads var(--ix-*))
+```
+
+Compound components follow the same context-provider pattern established as a convention across the codebase:
+
+```
+<Modal>     →  ModalRoot owns { open, onOpenChange, titleId, triggerRef } via ModalContext
+<Combobox>  →  ComboboxRoot owns { inputValue, open, activeId, selectedId, ... } via ComboboxContext
+```
+
+Each sub-component (`Modal.Title`, `Combobox.Item`, etc.) calls a `useXContext(componentName)` accessor that throws a clear, named error if rendered outside its root — rather than crashing on `null.someProperty` — matching the "fail loud, fail clear" pattern already used for `useDataGrid`/`useWorkflowEngine`.
+
+## Folder Structure
+
+```
+src/
+  styles/
+    tokens/
+      global.ts                          Tier 1 — raw color/spacing/radius/shadow/z-index/duration scales
+      semantic.ts                        Tier 2 — SemanticTokens contract + dark/light/high-contrast mappings
+      theme.css                          Tier 2 as CSS custom properties, scoped per [data-theme]
+  components/
+    compound/
+      Modal/
+        Modal.tsx                        Root — owns ModalContext (open/onOpenChange/titleId/triggerRef)
+        Trigger.tsx                      asChild-aware trigger button
+        Portal.tsx                       Modal-specific wrapper — unmounts Overlay/Content when closed
+        Overlay.tsx                      Backdrop
+        Content.tsx                      Dialog surface — focus trap, scroll lock, Escape-to-close
+        Header.tsx / Title.tsx / Body.tsx / Footer.tsx / CloseButton.tsx
+        context.ts                       ModalContext + useModalContext accessor
+        index.tsx                        Compound export: Modal.Trigger / .Portal / .Content / ...
+      Combobox/
+        Combobox.tsx                     Root — owns ComboboxContext, headless (no built-in filtering)
+        Input.tsx                        role="combobox", full Arrow/Home/End/Enter/Escape handling
+        List.tsx                         Popover listbox container
+        Item.tsx                         Individual option — aria-selected, click-to-select
+        Group.tsx                        Labeled option group wrapper
+        context.ts                       ComboboxContext + useComboboxContext accessor
+        index.tsx                        Compound export: Combobox.Input / .List / .Item / .Group
+    primitive/
+      Button.tsx                          Variant/size/loading/asChild button
+      Badge.tsx                           Variant/size/status-dot badge
+    utility/
+      Slot.tsx                            asChild mechanism — prop/ref/handler merging onto a single child
+      Portal.tsx                          Generic createPortal wrapper, SSR-safe, defaults to #ix-portal-root
+  core/
+    hooks/
+      useFocusTrap.ts                     Tab-wrapping focus trap + focus restoration, used by Modal.Content
+    utils/
+      cn.ts                               className-joining helper
+      mergeRefs.ts                        Merges a forwarded ref with an internally-owned ref
+  app/
+    (dashboard)/
+      design-system/
+        page.tsx                          Interactive showcase — theme toggle, token swatches, Modal/Combobox demos
+        design-system.module.css
+      test-modal/page.tsx                 Standalone scratch page verifying Modal in isolation
+```
+
+## Technical Decisions
+
+- **Split `accent.default` / `accent.solidBg` instead of one accent token.** A single accent color used both as link/icon text on a surface *and* as a button's filled background under white text can't hit AA in both roles simultaneously — verified per-theme via the contrast ratios noted in `semantic.ts`'s comments. This also fixes a latent issue in the app's original single `--ix-accent`.
+- **`theme.css` is additive, not a replacement — yet.** It resolves to identical values as the existing hardcoded `:root` block in `globals.css` under the default `dark` theme, so wiring it in changes nothing visually until `<html data-theme="...">` is verified working; the duplicate legacy block is left in place intentionally as a rollback path, to be deleted once confirmed.
+- **Context-provider compound pattern over prop drilling.** Both `Modal` and `Combobox` use the same `<Root>` + context + `useXContext(name)` shape already established by the codebase's other engines, rather than each compound component inventing its own composition mechanism.
+- **Headless Combobox — no built-in filtering.** `Combobox` deliberately does not own or filter an `items` array; the consumer filters their own data by `inputValue` from context and renders whatever `<Combobox.Item>`s match. This is what makes custom item templates and grouped sections possible without a rigid `items` + `renderItem` API.
+- **`aria-activedescendant` over moving DOM focus for Combobox.** Per the ARIA 1.2 combobox pattern, keyboard focus stays on the `<input>` at all times; the "active" option is only ever a visual + ARIA state (`aria-activedescendant`), read via a live DOM query of `[data-ix-combobox-item]` rather than a separate item registry kept in sync.
+- **`useFocusTrap` is a standalone hook, not baked into `Modal.Content`.** Focus trapping was built as a general-purpose primitive so any future dialog-like surface (e.g. a "modal mode" Combobox popover) can reuse it without depending on Modal internals.
+- **Unmount-on-close over CSS-hide for `Modal.Portal`.** Closed dialogs are removed from the DOM entirely (not just visually hidden), so focus-trap cleanup and body-scroll-lock restoration run reliably on every close, and closed content never lingers in the accessibility tree.
+- **One auto-generated portal root over `document.body` directly.** `<Portal>` defaults to a dedicated `#ix-portal-root` div (created on demand) instead of appending straight to `document.body`, keeping portal content out of the way of anything that walks `document.body`'s direct children.
+
+## Route Structure
+
+| Route              | Description                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| `/design-system`   | Interactive showcase — theme toggle (dark/light/high-contrast), resolved token swatches, live Modal and Combobox demos |
+| `/test-modal`       | Standalone scratch page verifying `<Modal>` composition in isolation                |
+
+## Server vs Client Components
+
+The entire token/component library is client-side by necessity — theming reads/writes `document.documentElement`, and every compound component depends on refs, portals, keyboard events, or focus management.
+
+- `"use client"`: every file under `components/compound/Modal/`, `components/compound/Combobox/`, `components/primitive/Button.tsx`, `components/primitive/Badge.tsx` (interactive variants), `components/utility/Slot.tsx`, `components/utility/Portal.tsx`, `useFocusTrap.ts`, `design-system/page.tsx`, `test-modal/page.tsx`.
+- `global.ts` and `semantic.ts` have no directive and are plain TypeScript modules — they could be imported from either environment, though today they're only consumed to generate `theme.css` and to resolve token values for display on the showcase page.
+
+## Performance Optimizations
+
+- **Zero-runtime-cost theme switching** — themes are pure CSS custom property scopes; toggling `data-theme` triggers a browser style recalculation, never a React re-render of themed subtrees.
+- **Unmount-on-close for Modal content** — no hidden, fully-mounted dialog DOM sitting around (and no wasted focus-trap listeners) when a modal isn't open.
+- **Live DOM query over a synced item registry in Combobox** — Arrow/Home/End navigation queries `[data-ix-combobox-item]` directly, avoiding a second source of truth that could drift from what's actually rendered (especially relevant if a future upgrade adds option virtualization).
+- **`requestAnimationFrame`-deferred initial focus** — both `useFocusTrap` and the Combobox's `ArrowDown`-when-closed path defer their first focus move one frame, so the newly-mounted/portaled content is guaranteed to be laid out first, avoiding a wasted no-op focus call.
+
+## Running the Project
+
+```bash
+npm install
+npm run dev
+```
+
+Then visit `http://localhost:3000/design-system` — use the theme toggle at the top to switch between dark/light/high-contrast and watch every token swatch and both compound components re-theme live.
+
+## Future Improvements
+
+- **Automated Color Contrast Audit Engine** (bonus challenge, not yet implemented): a runtime utility sampling rendered background/foreground pairs via canvas/DOM inspection and warning in the console on any AA/AAA violation. Currently, contrast ratios are hand-verified and documented as comments in `semantic.ts` rather than continuously checked.
+- Wire `theme.css` in as the actual single source of truth and delete the now-duplicate hardcoded `:root` block in `globals.css`, once confirmed safe.
+- Add virtualized option rendering to `Combobox.List` for large option sets (the requirement is scaffolded for but not yet exercised by the showcase page's small 3-person demo list).
+- Persist the user's chosen theme (currently local `useState` on the showcase page only) to a cookie or `localStorage`, and apply it globally via the root layout rather than only on `/design-system`.
+- Two small dead files — `components/compound/Modal/Slot.tsx` and `components/compound/Modal/Portal.tsx` — are unused duplicates of the shared `utility/` versions and can be deleted.
+- Extend `<Badge>`/`<Button>` with a formal Storybook-style catalog once the design system has more than two compound components.
+
+---
+
+# Task 06 – Frontend Resilience Architecture & Core Web Vitals Audit
+
+## Overview
+
+Task 06 hardens the Infinity X portal against two classes of production failure that a "happy path" build never has to face: uncaught JavaScript exceptions in any one part of the UI, and silent performance regressions that never show up in a demo but degrade real usage. It adds a three-tier error boundary hierarchy with structured telemetry, a native Core Web Vitals observer, and a fault-injection test suite to prove the isolation guarantees hold under real thrown errors — not just in theory.
+
+## Features
+
+- Three-tier error boundary hierarchy: component-level (`GranularErrorBoundary`), route-level (`(dashboard)/error.tsx`), and root-level (`global-error.tsx`) — a failure at one tier is provably invisible to the tiers above it
+- `GranularErrorBoundary` — class-based, with a single automatic retry (default 2s delay), a manual "Retry Widget" button, `resetKeys`-based auto-reset (e.g. reset on `workspaceId` change), and a `useErrorBoundary()` hook escape hatch for handing async/event-handler errors to the nearest boundary
+- Client telemetry pipeline (`errorLogger.ts`) — captures message, stack trace, active route, sanitized session storage, browser/connection info, and a `performance.memory` snapshot where available
+- PII sanitization — any object key matching a sensitive-key pattern (`password`, `token`, `secret`, `ssn`, `cookie`, `credit_card`, etc.) is redacted recursively before dispatch, regardless of source (session storage, event payloads)
+- Rate-limited dispatch — max 5 telemetry payloads per rolling 30-second window, with a single console warning rather than silent drops, so a cascading failure loop can't flood the network or the mock ingestion endpoint
+- Global `window.addEventListener('error' | 'unhandledrejection')` capture (`initErrorLogger`), for exceptions no React error boundary can ever see
+- `sendBeacon`-first dispatch with a `keepalive: true` fetch fallback, so telemetry survives the page unloading mid-request
+- Native Core Web Vitals observer (`webVitals.ts`) — LCP, INP (approximated via Event Timing, 98th-percentile), CLS (official session-windowed algorithm), TTFB, and FCP, built directly against `PerformanceObserver` with no third-party library
+- Color-coded console reporting (good / needs-improvement / poor) in development, plus a stricter internal early-warning flag (CLS > 0.05, INP > 150ms) that surfaces DOM-selector "culprit" info for CLS and INP
+- Offline service worker scaffolding — `swRegister.ts` / `ServiceWorkerInit.tsx`, gated to production by default (an active SW actively fights Next.js Fast Refresh in dev)
+- Interactive fault-injection suite (`/resilience-test`) — five isolated sections covering granular isolation, a simulated chunk-load failure, an intentionally unwrapped widget (proves Level 2 catches what Level 3 doesn't), an uncaught promise rejection (proves boundaries can't catch it, but the global listener does), and a high-CLS layout shift for visual/Lighthouse verification
+
+## Architecture
+
+```
+GranularErrorBoundary (L3)  →  wraps one widget; auto-retry + manual retry; never lets a throw escape
+(dashboard)/error.tsx  (L2)  →  Next.js route-segment boundary; catches whatever L3 didn't
+app/global-error.tsx    (L1)  →  Next.js root boundary; catches whatever L2 didn't; own <html>/<body>
+errorLogger.ts               →  called from all three tiers' catch points, tagged by severity
+webVitals.ts                  →  independent observer tree, started once from the root layout
+```
+
+Each tier is deliberately unaware of the tiers above or below it — `GranularErrorBoundary` doesn't know a route boundary exists, and `global-error.tsx` doesn't know which widget failed. The only shared contract between them is `logError(error, severity, source)`.
+
+`TelemetryInit` and `WebVitalsInit` are tiny client components mounted once each in the root layout purely so `RootLayout` itself can stay a Server Component (required for its `metadata` export) while still kicking off client-only observation on mount.
+
+## Folder Structure
+
+```
+src/
+  app/
+    global-error.tsx                        Level 1 — root boundary, inlined styles (own <html>/<body>)
+    (dashboard)/
+      error.tsx                              Level 2 — route/feature boundary
+      workspaces/[workspaceId]/
+        resilience-test/page.tsx              Fault injection test suite (5 sections)
+    api/telemetry/errors/route.ts             Mock ingestion endpoint — logs payload, returns 200
+  components/
+    feedback/
+      GranularErrorBoundary.tsx               Level 3 — class component + useErrorBoundary() hook
+  core/
+    telemetry/
+      errorLogger.ts                          Rate-limited, sanitized error telemetry pipeline
+      webVitals.ts                            LCP/INP/CLS/TTFB/FCP observers, console + pluggable reporter
+      TelemetryInit.tsx                        Mounts initErrorLogger() once from the root layout
+      WebVitalsInit.tsx                        Mounts initWebVitals() once from the root layout
+    utils/
+      swRegister.ts                            registerServiceWorker() / unregisterServiceWorker()
+      ServiceWorkerInit.tsx                     Mounts registerServiceWorker() once (not yet wired into layout)
+```
+
+## Technical Decisions
+
+- **Class components for error boundaries, functional wrapper on top.** `getDerivedStateFromError`/`componentDidCatch` have no Hook equivalent, so `GranularErrorBoundary` is a class per the task's engineering note — but `useErrorBoundary()` gives function-component consumers a Hook-shaped way to hand it an async/event-handler error, by re-throwing during the next render.
+- **`resetKeysAtError` snapshotted at catch-time, not compared against React's `prevProps`.** On the exact render where an error is caught, `prevProps` is already stale relative to the update that caused the crash — comparing against it would reset the boundary in the same commit that just caught the error, so the fallback UI would never actually be visible. The boundary instead baselines `resetKeys` the moment it catches, then compares future updates against that baseline.
+- **One automatic retry, not infinite.** `hasAutoRetried` gates the timer-based retry to a single attempt per error; a manual "Retry Widget" click is always available regardless, so a persistently-broken widget doesn't retry-loop forever while still giving the user a way to try again after fixing the underlying condition (e.g. network back online).
+- **`global-error.tsx` inlines all its styles.** Next.js only renders this component when an error escapes every other boundary including the root `layout.tsx` — so `globals.css` and any providers from the normal layout aren't guaranteed to be mounted. Hex values are hardcoded rather than reading `--ix-*` custom properties, since the CSS that defines them may be exactly what failed to load.
+- **Rate limiting lives in the logger, not each boundary.** A single shared 30-second/5-payload window across `errorLogger.ts` means a cascading failure that trips all three tiers at once still only sends 5 payloads total, not 5 per tier.
+- **Recursive key-pattern sanitization over an allowlist.** Session storage and any nested object passed into a payload is walked recursively and redacted by key pattern (`password`, `token`, `ssn`, etc.) rather than allowlisting known-safe keys — safer default for a system that doesn't control what ends up in `sessionStorage` over time.
+- **`sendBeacon` first, `keepalive: true` fetch as fallback.** `sendBeacon` is designed exactly for "fire this during page unload" telemetry; the fetch fallback only runs if `sendBeacon` is unsupported or its own dispatch reports failure.
+- **CLS/INP computed against the official algorithms, not simplified proxies.** CLS uses the spec's session-windowing (sub-1s gaps, sub-5s span, report the worst session), and INP is approximated as the 98th-percentile interaction duration — matching the actual Web Vitals methodology rather than e.g. "worst single interaction," which would over-report.
+- **Service worker registration is opt-in and production-gated.** An active SW aggressively caching assets fights Next.js's dev-mode Fast Refresh (stale content after a code change is a confusing bug to chase without knowing why); `NEXT_PUBLIC_ENABLE_SW=true` force-enables it locally when the SW itself needs testing.
+
+## Route Structure
+
+| Route                                                        | Description                                                                                     |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `/workspaces/[workspaceId]/resilience-test`                    | Fault-injection suite — granular isolation, chunk-load failure, unwrapped-widget escalation, uncaught rejection, high-CLS trigger |
+| `/api/telemetry/errors`                                        | Mock POST sink for `errorLogger.ts` payloads — logs to the server console, returns 200            |
+
+## Server vs Client Components
+
+- **Server:** `app/api/telemetry/errors/route.ts` is a Route Handler, not a component.
+- **Client (`"use client"`):** `global-error.tsx` and `(dashboard)/error.tsx` (both required by Next.js to be client components), `GranularErrorBoundary.tsx`, `errorLogger.ts`'s browser-facing calls, `webVitals.ts`, `TelemetryInit.tsx`, `WebVitalsInit.tsx`, `ServiceWorkerInit.tsx`, `swRegister.ts`, `resilience-test/page.tsx`.
+
+## Performance Optimizations
+
+- **Rate-limited telemetry dispatch** bounds outbound network calls to 5 per 30s regardless of how many errors fire, preventing a cascading failure from also becoming a network-flooding incident.
+- **`sendBeacon` over synchronous `fetch`** for error dispatch, avoiding blocking or racing the page's unload/navigation.
+- **Vitals observers disconnect themselves once finalized** (LCP on first input/tab-hide, CLS/INP on `visibilitychange`), so none of the five `PerformanceObserver` instances keep running indefinitely after their metric is captured.
+- **Auto-retry and manual retry both reset local component state only** — recovering a `GranularErrorBoundary` never triggers a full page reload or remounts anything outside the failed widget's subtree.
+- **Service worker registration deferred and gated**, so it never runs — and never fights the dev server — outside of production or an explicit opt-in flag.
+
+## Running the Project
+
+```bash
+npm install
+npm run dev
+```
+
+Then visit `http://localhost:3000/workspaces/ws-001/resilience-test` and open the browser console. Work through each section (A–E) to verify:
+
+- Crashing one widget in Section A never affects its siblings.
+- The Section B chunk-load simulation recovers the same way.
+- Section C's intentionally-unwrapped widget escalates to the `(dashboard)/error.tsx` route boundary — confirm the rest of the shell (sidebar, header) stays mounted.
+- Section D's floating promise rejection is caught only by `errorLogger`'s global listener, never by a boundary — check the console/network tab for the telemetry payload.
+- Section E's layout shift is visible and gets flagged in the console by `webVitals.ts` once wired in.
+
+## Future Improvements
+
+- **Automated Chunk Load Error Auto-Healer** (bonus challenge, not yet implemented): intercept script-loading failures caused by stale deployment asset hashes, verify a version mismatch via a lightweight endpoint check, and trigger one silent background refresh — `swRegister.ts`'s `updatefound`/`statechange` listener currently only logs that a new version is available rather than acting on it.
+- **Wire up the offline PWA layer.** `public/sw.js` (the actual service worker file with the caching/offline-shell strategy) was not part of this deliverable set, and `ServiceWorkerInit` is built but not yet mounted in `app/layout.tsx` — right now `registerServiceWorker()` would 404 against `/sw.js` if called. This is the main remaining gap in Task 06.
+- Replace the mock `/api/telemetry/errors` sink with a real ingestion pipeline (Sentry, Datadog, or a custom store).
+- Feed `webVitals.ts`'s `setVitalsReporter()` into the same telemetry dispatch path as `errorLogger.ts`, rather than only logging vitals to the console in development.
+- Add automated tests asserting the Level 3 → Level 2 → Level 1 isolation guarantees (currently verified manually via `/resilience-test`), and regression tests around the CLS/INP threshold flagging.
+- Extend `sanitize()`'s key-pattern list as new sensitive field names are introduced elsewhere in the app, since it's pattern-based rather than schema-driven.

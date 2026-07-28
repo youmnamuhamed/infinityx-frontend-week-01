@@ -9,7 +9,6 @@ export default async function ResourcesIndexPage({ params }: ResourcesIndexPageP
   return (
     <section aria-labelledby="resources-heading">
       <h1 id="resources-heading">Resources — Workspace {workspaceId}</h1>
-      <p>The full resource data grid (Task 2) will render here.</p>
     </section>
   );
 }

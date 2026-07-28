@@ -3,6 +3,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 import { navGroups } from "@/core/config/navigation";
 import { SidebarToggle } from "@/components/layout/SidebarToggle";
@@ -23,7 +24,14 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   return (
     <aside className="dashboard-sidebar" aria-label="Primary navigation">
       <div className="sidebar-logo">
-        <span className="sidebar-logo__badge">IX</span>
+        <Image
+          src="/infinitylogo.webp"
+          alt="Infinity X"
+          width={28}
+          height={28}
+          className="sidebar-logo__badge"
+          priority
+        />
         {!isCollapsed && <span className="sidebar-logo__text">Infinity X</span>}
       </div>
 
