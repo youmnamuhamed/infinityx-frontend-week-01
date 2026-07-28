@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { logError } from "@/core/telemetry/errorLogger";
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -35,10 +36,7 @@ export default function GlobalError({
   reset,
 }: GlobalErrorProps): React.ReactElement {
   useEffect(() => {
-    // TODO: replace with errorLogger.logError() once src/core/telemetry/errorLogger.ts
-    // exists (next deliverable). This is the highest-severity error tier, so when
-    // telemetry is wired in, flag this payload with severity: "critical".
-    console.error("[GlobalError:root-boundary]", error);
+    logError(error, "critical", "global-error");
   }, [error]);
 
   const handleHardReset = (): void => {

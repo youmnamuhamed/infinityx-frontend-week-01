@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { logError } from "@/core/telemetry/errorLogger";
 
 interface DashboardErrorProps {
   error: Error & { digest?: string };
@@ -22,9 +23,7 @@ export default function DashboardError({
   reset,
 }: DashboardErrorProps): React.ReactElement {
   useEffect(() => {
-    // TODO: replace with errorLogger.logError() once src/core/telemetry/errorLogger.ts
-    // exists (next deliverable). Keep this call site stable — only the body changes.
-    console.error("[DashboardError:route-boundary]", error);
+    logError(error, "route", window.location.pathname);
   }, [error]);
 
   return (

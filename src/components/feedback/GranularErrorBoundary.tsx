@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { logError } from "@/core/telemetry/errorLogger";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,15 @@ export class GranularErrorBoundary extends React.Component<
 > {
   private autoRetryTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Snapshot of resetKeys taken at the moment we caught the current error.
+  // Only meaningful while this.state.error is non-null. We compare future
+  // prop updates against THIS baseline rather than React's own prevProps,
+  // because on the very render where the error is caught, prevProps is
+  // already stale relative to the update that caused the crash — comparing
+  // against it would make the boundary reset itself in the same commit it
+  // just caught the error in, and the fallback UI would never be visible.
+  private resetKeysAtError: ReadonlyArray<unknown> | null = null;
+
   constructor(props: GranularErrorBoundaryProps) {
     super(props);
     this.state = { error: null, hasAutoRetried: false };
@@ -52,13 +62,10 @@ export class GranularErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    // TODO: replace with errorLogger.logError() once src/core/telemetry/errorLogger.ts
-    // exists (next deliverable). Keep this call site stable — only the body changes.
-    console.error(
-      `[GranularErrorBoundary:${this.props.name}]`,
-      error,
-      errorInfo,
-    );
+    // Baseline the resetKeys as of the render that caused the crash.
+    this.resetKeysAtError = this.props.resetKeys ?? [];
+
+    logError(error, "component", this.props.name);
     this.props.onError?.(error, errorInfo);
 
     if (!this.state.hasAutoRetried) {
@@ -69,13 +76,13 @@ export class GranularErrorBoundary extends React.Component<
     }
   }
 
-  componentDidUpdate(prevProps: GranularErrorBoundaryProps): void {
-    if (!this.state.error) return;
-    const prevKeys = prevProps.resetKeys ?? [];
+  componentDidUpdate(): void {
+    if (!this.state.error || !this.resetKeysAtError) return;
+    const baseline = this.resetKeysAtError;
     const nextKeys = this.props.resetKeys ?? [];
     const changed =
-      prevKeys.length !== nextKeys.length ||
-      prevKeys.some((key, i) => !Object.is(key, nextKeys[i]));
+      baseline.length !== nextKeys.length ||
+      baseline.some((key, i) => !Object.is(key, nextKeys[i]));
     if (changed) {
       this.reset(false);
     }
@@ -90,6 +97,7 @@ export class GranularErrorBoundary extends React.Component<
       clearTimeout(this.autoRetryTimeout);
       this.autoRetryTimeout = null;
     }
+    this.resetKeysAtError = null;
     this.setState({ error: null, hasAutoRetried: viaAutoRetry ? true : false });
   };
 
