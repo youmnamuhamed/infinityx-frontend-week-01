@@ -6,8 +6,8 @@ Frontend internship deliverables for **Infinity X Solutions**, built with Next.j
 - **Task 02** — Headless, high-performance virtualized data grid
 - **Task 03** — Multi-step provisioning wizard with a generic workflow engine
 - **Task 04** — Real-time telemetry stream & resilient optimistic UI engine
-- **Task 05** — Real-time telemetry stream & resilient optimistic UI engine
-- **Task 06** — Real-time telemetry stream & resilient optimistic UI engine
+- **Task 05** — Enterprise Component Library Architecture & Design Token Engine
+- **Task 06** — Frontend Resilience Architecture & Core Web Vitals Audit
 
 ---
 
@@ -361,7 +361,6 @@ npm run dev
 Then visit the provisioning wizard route under your workspace  
 `http://localhost:3000/workspaces/ws-001/provision`
 
-
 ## Future Improvements
 
 - Persist drafts server-side (per user) instead of local/client-side storage, once auth exists.
@@ -476,7 +475,6 @@ To exercise the resilience features:
 - Allow rapid repeated CPU-limit adjustments to cancel-and-replace the in-flight mutation instead of being dropped by the duplicate-dispatch guard, if that turns out to be the desired UX.
 - Persist the connection's `isPaused` preference across a page reload.
 
-
 # Task 05 – Enterprise Component Library Architecture & Design Token Engine
 
 ## Overview
@@ -567,7 +565,7 @@ src/
 
 ## Technical Decisions
 
-- **Split `accent.default` / `accent.solidBg` instead of one accent token.** A single accent color used both as link/icon text on a surface *and* as a button's filled background under white text can't hit AA in both roles simultaneously — verified per-theme via the contrast ratios noted in `semantic.ts`'s comments. This also fixes a latent issue in the app's original single `--ix-accent`.
+- **Split `accent.default` / `accent.solidBg` instead of one accent token.** A single accent color used both as link/icon text on a surface _and_ as a button's filled background under white text can't hit AA in both roles simultaneously — verified per-theme via the contrast ratios noted in `semantic.ts`'s comments. This also fixes a latent issue in the app's original single `--ix-accent`.
 - **`theme.css` is additive, not a replacement — yet.** It resolves to identical values as the existing hardcoded `:root` block in `globals.css` under the default `dark` theme, so wiring it in changes nothing visually until `<html data-theme="...">` is verified working; the duplicate legacy block is left in place intentionally as a rollback path, to be deleted once confirmed.
 - **Context-provider compound pattern over prop drilling.** Both `Modal` and `Combobox` use the same `<Root>` + context + `useXContext(name)` shape already established by the codebase's other engines, rather than each compound component inventing its own composition mechanism.
 - **Headless Combobox — no built-in filtering.** `Combobox` deliberately does not own or filter an `items` array; the consumer filters their own data by `inputValue` from context and renders whatever `<Combobox.Item>`s match. This is what makes custom item templates and grouped sections possible without a rigid `items` + `renderItem` API.
@@ -578,10 +576,10 @@ src/
 
 ## Route Structure
 
-| Route              | Description                                                                       |
-| ------------------ | ----------------------------------------------------------------------------------- |
-| `/design-system`   | Interactive showcase — theme toggle (dark/light/high-contrast), resolved token swatches, live Modal and Combobox demos |
-| `/test-modal`       | Standalone scratch page verifying `<Modal>` composition in isolation                |
+| Route            | Description                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `/design-system` | Interactive showcase — theme toggle (dark/light/high-contrast), resolved token swatches, live Modal and Combobox demos |
+| `/test-modal`    | Standalone scratch page verifying `<Modal>` composition in isolation                                                   |
 
 ## Server vs Client Components
 
@@ -690,10 +688,10 @@ src/
 
 ## Route Structure
 
-| Route                                                        | Description                                                                                     |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `/workspaces/[workspaceId]/resilience-test`                    | Fault-injection suite — granular isolation, chunk-load failure, unwrapped-widget escalation, uncaught rejection, high-CLS trigger |
-| `/api/telemetry/errors`                                        | Mock POST sink for `errorLogger.ts` payloads — logs to the server console, returns 200            |
+| Route                                       | Description                                                                                                                       |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `/workspaces/[workspaceId]/resilience-test` | Fault-injection suite — granular isolation, chunk-load failure, unwrapped-widget escalation, uncaught rejection, high-CLS trigger |
+| `/api/telemetry/errors`                     | Mock POST sink for `errorLogger.ts` payloads — logs to the server console, returns 200                                            |
 
 ## Server vs Client Components
 
